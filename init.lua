@@ -11,7 +11,6 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
-
 -- Core settings
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
@@ -50,7 +49,6 @@ vim.keymap.set("n", "<C-l>", "<C-w>l", { silent = true })
 vim.keymap.set("n", "<leader>,", ":noh<CR>", { noremap = true, silent = true }) -- Clear search highlights
 vim.keymap.set("n", "<leader>x", ":bd<CR>", { noremap = true, silent = true }) -- Close buffer
 
-
 -- Plugin setup with lazy.nvim
 require("lazy").setup({
   spec = {
@@ -64,6 +62,7 @@ require("lazy").setup({
     { "numToStr/Comment.nvim" },
     { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" },
     { "razak17/tailwind-fold.nvim", config = true },
+    { 'nvim-lualine/lualine.nvim', dependencies = { 'nvim-tree/nvim-web-devicons' } },
   },
   install = { colorscheme = { "nord" } },
   checker = { enabled = true },
@@ -90,7 +89,6 @@ require("nvim-tree").setup({
 })
 vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { silent = true })
 
-
 -- Telescope setup and mappings
 require("telescope").setup({
   defaults = {
@@ -115,7 +113,6 @@ vim.keymap.set("n", "<leader>fb", require("telescope.builtin").buffers, { norema
 vim.keymap.set("n", "<leader>ff", require("telescope.builtin").find_files, { noremap = true, silent = true })
 vim.keymap.set("n", "<leader>fw", require("telescope.builtin").live_grep, { noremap = true, silent = true })
 vim.keymap.set("v", "<leader>fw", function()
-  -- Yank the selected text to the unnamed register
   vim.cmd('noau normal! "vy')
   local selected_text = vim.fn.getreg("v") -- Get the yanked text from visual mode selection
   require("telescope.builtin").live_grep({ default_text = selected_text })
@@ -138,7 +135,6 @@ vim.keymap.set(
   { noremap = true, silent = true }
 )
 
-
 -- Treesitter setup
 require("nvim-treesitter.configs").setup({
   ensure_installed = { "html", "css", "javascript", "typescript", "python", "htmldjango" },
@@ -151,6 +147,12 @@ vim.opt.foldmethod = "expr"
 vim.opt.foldexpr = "nvim_treesitter#foldexpr()"  -- Fold css classes using tailwind-fold.nvim
 vim.opt.foldlevel = 99  -- Start with all folds open
 
+-- Lualine setup
+require('lualine').setup({
+  options = {
+    theme = 'nord'
+  }
+})
 
 -- Mason and LSP configuration for Python (pylsp)
 require("mason").setup()
@@ -172,7 +174,6 @@ require("lspconfig").pylsp.setup({
     vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
   end,
 })
-
 
 -- Autocommands
 vim.api.nvim_create_autocmd("VimEnter", {
