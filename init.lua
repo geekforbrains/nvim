@@ -11,6 +11,23 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+-- Function to toggle the quickfix list
+function _G.toggle_quickfix()
+  local quickfix_open = false
+  for _, win in ipairs(vim.fn.getwininfo()) do
+    if win.quickfix == 1 then
+      quickfix_open = true
+      break
+    end
+  end
+
+  if quickfix_open then
+    vim.cmd("cclose")
+  else
+    vim.cmd("copen")
+  end
+end
+
 -- Core settings
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
@@ -26,6 +43,7 @@ vim.opt.splitbelow = true
 vim.opt.splitright = true
 vim.opt.fillchars = { vert = " ", horiz = " ", eob = " " }
 vim.opt.wrap = false
+vim.opt.colorcolumn = "100"
 
 -- Indentation settings
 vim.opt.expandtab = true
@@ -48,7 +66,9 @@ vim.keymap.set("n", "<C-k>", "<C-w>k", { silent = true })
 vim.keymap.set("n", "<C-l>", "<C-w>l", { silent = true })
 vim.keymap.set("n", "<leader>,", ":noh<CR>", { noremap = true, silent = true }) -- Clear search highlights
 vim.keymap.set("n", "<leader>x", ":bd<CR>", { noremap = true, silent = true }) -- Close buffer
-
+vim.keymap.set("n", "<leader>o", toggle_quickfix, { noremap = true, silent = true }) -- Toggle quidkfix list
+vim.keymap.set("n", "<leader>w", ":set wrap!<CR>", { noremap = true, silent = true }) -- Toggle line wrap
+ 
 -- Plugin setup with lazy.nvim
 require("lazy").setup({
   spec = {
@@ -82,9 +102,9 @@ require("nvim-tree").setup({
   sort = { sorter = "case_sensitive" },
   view = { width = 24 },
   renderer = { group_empty = true },
-  filters = { 
-    dotfiles = true,
-    custom = { "node_modules", "__pycache__" },
+  filters = {
+    dotfiles = false,  -- Show dotfiles (like .env)
+    custom = { "node_modules", "__pycache__", "^env$", "^.git$" },  -- Hide "env/" directory
   },
 })
 vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { silent = true })
@@ -154,9 +174,21 @@ require('lualine').setup({
   }
 })
 
--- Mason and LSP configuration for Python (pylsp)
+-- Global LSP keybindings that apply to all LSP servers
+local on_attach = function(client, bufnr)
+  local opts = { noremap = true, silent = true, buffer = bufnr }
+  vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+  vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+  vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+  vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+  vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+end
+
+-- Mason and LSP configuration
 require("mason").setup()
 require("mason-lspconfig").setup({ ensure_installed = { "pylsp" } })
+
+-- Setup for Python LSP
 require("lspconfig").pylsp.setup({
   settings = {
     pylsp = {
@@ -168,12 +200,21 @@ require("lspconfig").pylsp.setup({
       },
     },
   },
-  on_attach = function(client, bufnr)
-    local opts = { noremap = true, silent = true, buffer = bufnr }
-    vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
-    vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
-  end,
+  on_attach = on_attach,
 })
+
+-- Setup any other language servers that you have installed via Mason
+-- This ensures the global keybindings are applied to all language servers
+local lspconfig = require("lspconfig")
+local servers = { "ts_ls", "jsonls", "html", "cssls" } -- Add any other servers you use
+
+for _, server in ipairs(servers) do
+  if lspconfig[server] then
+    lspconfig[server].setup({
+      on_attach = on_attach,
+    })
+  end
+end
 
 -- Autocommands
 vim.api.nvim_create_autocmd("VimEnter", {
