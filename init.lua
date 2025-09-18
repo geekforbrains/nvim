@@ -246,25 +246,33 @@ require('lualine').setup({
   }
 })
 
--- Global LSP keybindings that apply to all LSP servers
-local on_attach = function(client, bufnr)
-  local opts = { noremap = true, silent = true, buffer = bufnr }
-  vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
-  vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
-  vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
-  vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
-  vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
-end
+-- Global LSP keybindings using LspAttach autocmd (Neovim 0.11+ way)
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if not client then return end
 
--- Mason and LSP configuration
+    local bufnr = args.buf
+    local opts = { noremap = true, silent = true, buffer = bufnr }
+
+    vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+    vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+    vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+    vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+    vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+  end,
+})
+
+-- Mason setup (still needed for installing language servers)
 require("mason").setup()
-require("mason-lspconfig").setup({ 
-  ensure_installed = { "pylsp", "jsonls" },
+require("mason-lspconfig").setup({
+  ensure_installed = { "pylsp", "jsonls", "ts_ls" },
   automatic_enable = false  -- Disable automatic setup to prevent duplicates
 })
 
--- Setup for Python LSP
-require("lspconfig").pylsp.setup({
+-- Configure language servers using the new vim.lsp.config API (Neovim 0.11+)
+-- Python LSP with custom settings
+vim.lsp.config("pylsp", {
   settings = {
     pylsp = {
       plugins = {
@@ -275,21 +283,17 @@ require("lspconfig").pylsp.setup({
       },
     },
   },
-  on_attach = on_attach,
 })
 
--- Setup any other language servers that you have installed via Mason
--- This ensures the global keybindings are applied to all language servers
-local lspconfig = require("lspconfig")
-local servers = { "ts_ls", "jsonls", "html", "cssls" } -- Add any other servers you use
-
+-- Configure other language servers with default settings
+local servers = { "ts_ls", "jsonls", "html", "cssls" }
 for _, server in ipairs(servers) do
-  if lspconfig[server] then
-    lspconfig[server].setup({
-      on_attach = on_attach,
-    })
-  end
+  -- Basic config for each server (configs will be loaded from nvim-lspconfig)
+  vim.lsp.config(server, {})
 end
+
+-- Enable all configured language servers (including pylsp)
+vim.lsp.enable({ "pylsp", "ts_ls", "jsonls", "html", "cssls" })
 
 -- Autocommands
 vim.api.nvim_create_autocmd("VimEnter", {
