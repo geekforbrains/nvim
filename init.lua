@@ -50,6 +50,8 @@ vim.opt.splitright = true
 vim.opt.fillchars = { vert = " ", horiz = " ", eob = " " }
 vim.opt.wrap = false
 vim.opt.colorcolumn = "100"
+vim.opt.foldmethod = "manual"
+vim.opt.foldlevel = 99
 
 -- Indentation settings
 vim.opt.expandtab = true
@@ -73,7 +75,10 @@ vim.keymap.set("n", "<C-l>", "<C-w>l", { silent = true })
 vim.keymap.set("n", "<leader>,", ":noh<CR>", { noremap = true, silent = true }) -- Clear search highlights
 vim.keymap.set("n", "<leader>x", ":bd<CR>", { noremap = true, silent = true }) -- Close buffer
 vim.keymap.set("n", "<leader>o", toggle_quickfix, { noremap = true, silent = true }) -- Toggle quidkfix list
-vim.keymap.set("n", "<leader>w", ":set wrap!<CR>", { noremap = true, silent = true }) -- Toggle line wrap
+vim.keymap.set("n", "<leader>w", function()
+  vim.wo.wrap = not vim.wo.wrap
+  vim.wo.linebreak = vim.wo.wrap
+end, { noremap = true, silent = true }) -- Toggle line wrap
  
 -- Plugin setup with lazy.nvim
 require("lazy").setup({
@@ -86,7 +91,13 @@ require("lazy").setup({
     { "williamboman/mason.nvim" },
     { "williamboman/mason-lspconfig.nvim" },
     { "numToStr/Comment.nvim" },
-    { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" },
+    { "nvim-treesitter/nvim-treesitter", branch = "master", build = ":TSUpdate" },
+    {
+      "MeanderingProgrammer/render-markdown.nvim",
+      lazy = false,
+      dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-tree/nvim-web-devicons" },
+      opts = {},
+    },
     { "razak17/tailwind-fold.nvim", config = true },
     { 'nvim-lualine/lualine.nvim', dependencies = { 'nvim-tree/nvim-web-devicons' } },
   },
@@ -97,6 +108,8 @@ vim.cmd("colorscheme nord")
 
 -- Nvim-tree setup and mappings
 require("nvim-tree").setup({
+  disable_netrw = true,
+  hijack_netrw = false,
   on_attach = function(bufnr)
     local api = require('nvim-tree.api')
     local opts = { buffer = bufnr, noremap = true, silent = true, nowait = true }
@@ -229,15 +242,43 @@ vim.keymap.set(
 
 -- Treesitter setup
 require("nvim-treesitter.configs").setup({
-  ensure_installed = { "html", "css", "javascript", "typescript", "python", "htmldjango" },
+  ensure_installed = {
+    "html",
+    "css",
+    "javascript",
+    "typescript",
+    "python",
+    "htmldjango",
+    "markdown",
+    "markdown_inline",
+  },
   highlight = {
     enable = true,
     additional_vim_regex_highlighting = false,
   },
 })
-vim.opt.foldmethod = "expr"
-vim.opt.foldexpr = "nvim_treesitter#foldexpr()"  -- Fold css classes using tailwind-fold.nvim
-vim.opt.foldlevel = 99  -- Start with all folds open
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "html", "css", "javascript", "typescript", "python", "htmldjango" },
+  callback = function()
+    vim.opt_local.foldmethod = "expr"
+    vim.opt_local.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+    vim.opt_local.foldlevel = 99
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "markdown", "markdown.mdx" },
+  callback = function()
+    vim.opt_local.wrap = true
+    vim.opt_local.linebreak = true
+    vim.opt_local.breakindent = true
+    vim.opt_local.conceallevel = 2
+    vim.opt_local.concealcursor = "nc"
+    vim.opt_local.colorcolumn = ""
+    vim.opt_local.foldmethod = "manual"
+  end,
+})
 
 -- Lualine setup
 require('lualine').setup({
