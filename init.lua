@@ -91,7 +91,10 @@ require("lazy").setup({
     { "williamboman/mason.nvim" },
     { "williamboman/mason-lspconfig.nvim" },
     { "numToStr/Comment.nvim" },
-    { "nvim-treesitter/nvim-treesitter", branch = "master", build = ":TSUpdate" },
+    -- `main` is required on Neovim 0.12: the archived `master` branch crashes in
+    -- query directives (it predates the removal of the `all` option).
+    -- `main` is a rewrite and does not support lazy-loading.
+    { "nvim-treesitter/nvim-treesitter", branch = "main", lazy = false, build = ":TSUpdate" },
     {
       "MeanderingProgrammer/render-markdown.nvim",
       lazy = false,
@@ -241,26 +244,21 @@ vim.keymap.set(
 )
 
 -- Treesitter setup
-require("nvim-treesitter.configs").setup({
-  ensure_installed = {
-    "html",
-    "css",
-    "javascript",
-    "typescript",
-    "python",
-    "htmldjango",
-    "markdown",
-    "markdown_inline",
-  },
-  highlight = {
-    enable = true,
-    additional_vim_regex_highlighting = false,
-  },
-})
+-- The `main` branch has no module system: no `configs.setup()`, no `ensure_installed`,
+-- no `highlight.enable`. Parsers are installed via the Lua API and highlighting is
+-- started per-buffer with `vim.treesitter.start()`.
+--
+-- markdown/markdown_inline are deliberately absent: Neovim 0.12 bundles both parsers
+-- and their queries, and installing them here shadows the bundled ones.
+-- For these languages the parser name matches the filetype, so one list serves both.
+local ts_languages = { "html", "css", "javascript", "typescript", "python", "htmldjango" }
+require("nvim-treesitter").install(ts_languages)
 
 vim.api.nvim_create_autocmd("FileType", {
-  pattern = { "html", "css", "javascript", "typescript", "python", "htmldjango" },
+  pattern = ts_languages,
   callback = function()
+    -- Parsers install asynchronously, so this can legitimately fail on first launch.
+    pcall(vim.treesitter.start)
     vim.opt_local.foldmethod = "expr"
     vim.opt_local.foldexpr = "v:lua.vim.treesitter.foldexpr()"
     vim.opt_local.foldlevel = 99
