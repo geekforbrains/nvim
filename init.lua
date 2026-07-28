@@ -83,29 +83,96 @@ end, { noremap = true, silent = true }) -- Toggle line wrap
 -- Plugin setup with lazy.nvim
 require("lazy").setup({
   spec = {
+    -- Eager: needed before the first screen is drawn.
     { "shaunsingh/nord.nvim" },
     { "nvim-tree/nvim-tree.lua" },
-    { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
-    { "github/copilot.vim" },
-    { "neovim/nvim-lspconfig" },
-    { "williamboman/mason.nvim" },
-    { "williamboman/mason-lspconfig.nvim" },
-    { "numToStr/Comment.nvim" },
+    { "neovim/nvim-lspconfig" }, -- data only; supplies lsp/*.lua for vim.lsp.enable()
+    { "nvim-lualine/lualine.nvim", dependencies = { "nvim-tree/nvim-web-devicons" } },
     -- `main` is required on Neovim 0.12: the archived `master` branch crashes in
     -- query directives (it predates the removal of the `all` option).
     -- `main` is a rewrite and does not support lazy-loading.
     { "nvim-treesitter/nvim-treesitter", branch = "main", lazy = false, build = ":TSUpdate" },
+
+    -- Lazy: kept off the startup path.
+    {
+      "nvim-telescope/telescope.nvim",
+      dependencies = { "nvim-lua/plenary.nvim" },
+      cmd = "Telescope",
+      keys = {
+        { "<leader>fb", function() require("telescope.builtin").buffers() end, desc = "Telescope buffers" },
+        { "<leader>ff", function() require("telescope.builtin").find_files() end, desc = "Telescope find files" },
+        { "<leader>fw", function() require("telescope.builtin").live_grep() end, desc = "Telescope live grep" },
+        {
+          "<leader>fw",
+          function()
+            vim.cmd('noau normal! "vy')
+            require("telescope.builtin").live_grep({ default_text = vim.fn.getreg("v") })
+          end,
+          mode = "v",
+          desc = "Telescope live grep (selection)",
+        },
+      },
+      config = function()
+        -- required inside config() so it does not drag telescope onto the startup path
+        local actions = require("telescope.actions")
+        require("telescope").setup({
+          defaults = {
+            mappings = {
+              i = {
+                ["<C-j>"] = actions.move_selection_next,
+                ["<C-k>"] = actions.move_selection_previous,
+              },
+              n = {
+                ["<C-j>"] = actions.move_selection_next,
+                ["<C-k>"] = actions.move_selection_previous,
+              },
+            },
+            layout_strategy = "vertical",
+            layout_config = {
+              vertical = { preview_height = 0.7 },
+              preview_cutoff = 0,
+            },
+          },
+        })
+      end,
+    },
+    { "github/copilot.vim", event = "InsertEnter" },
+    -- mason is only needed to install servers; vim.lsp.enable() below does the wiring.
+    -- VeryLazy (not cmd) so ensure_installed still runs, just after the UI is up.
+    { "mason-org/mason.nvim", event = "VeryLazy", opts = {} },
+    {
+      "mason-org/mason-lspconfig.nvim",
+      event = "VeryLazy",
+      dependencies = { "mason-org/mason.nvim" },
+      opts = {
+        ensure_installed = { "pylsp", "jsonls", "ts_ls" },
+        automatic_enable = false, -- servers are enabled explicitly below
+      },
+    },
     {
       "MeanderingProgrammer/render-markdown.nvim",
-      lazy = false,
-      dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-tree/nvim-web-devicons" },
+      ft = { "markdown", "markdown.mdx" },
+      dependencies = { "nvim-tree/nvim-web-devicons" },
       opts = {},
     },
-    { "razak17/tailwind-fold.nvim", config = true },
-    { 'nvim-lualine/lualine.nvim', dependencies = { 'nvim-tree/nvim-web-devicons' } },
+    {
+      "razak17/tailwind-fold.nvim",
+      ft = { "html", "css", "javascript", "typescript", "javascriptreact", "typescriptreact", "htmldjango" },
+      opts = {},
+    },
   },
   install = { colorscheme = { "nord" } },
   checker = { enabled = true },
+  -- No plugin here uses luarocks; this skips the hererocks bootstrap and the
+  -- spurious ERROR it otherwise reports in `:checkhealth lazy`.
+  rocks = { enabled = false },
+  performance = {
+    rtp = {
+      -- Built-in plugins that go unused here. matchit/matchparen are deliberately
+      -- kept -- they provide `%` matching and paren highlighting.
+      disabled_plugins = { "gzip", "tarPlugin", "zipPlugin", "netrwPlugin", "tohtml", "tutor" },
+    },
+  },
 })
 vim.cmd("colorscheme nord")
 
@@ -197,51 +264,12 @@ require("nvim-tree").setup({
 })
 vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>", { silent = true })
 
--- Telescope setup and mappings
-require("telescope").setup({
-  defaults = {
-    mappings = {
-      i = {
-        ["<C-j>"] = require("telescope.actions").move_selection_next,
-        ["<C-k>"] = require("telescope.actions").move_selection_previous,
-      },
-      n = {
-        ["<C-j>"] = require("telescope.actions").move_selection_next,
-        ["<C-k>"] = require("telescope.actions").move_selection_previous,
-      },
-    },
-    layout_strategy = "vertical",
-    layout_config = {
-      vertical = { preview_height = 0.7 },
-      preview_cutoff = 0,
-    },
-  },
-})
-vim.keymap.set("n", "<leader>fb", require("telescope.builtin").buffers, { noremap = true, silent = true })
-vim.keymap.set("n", "<leader>ff", require("telescope.builtin").find_files, { noremap = true, silent = true })
-vim.keymap.set("n", "<leader>fw", require("telescope.builtin").live_grep, { noremap = true, silent = true })
-vim.keymap.set("v", "<leader>fw", function()
-  vim.cmd('noau normal! "vy')
-  local selected_text = vim.fn.getreg("v") -- Get the yanked text from visual mode selection
-  require("telescope.builtin").live_grep({ default_text = selected_text })
-end, { noremap = true, silent = true })
+-- Telescope is configured in its lazy spec above (keys = ... / config = ...).
 
--- Comment.nvim setup and mappings
-require("Comment").setup({
-  mappings = { basic = true, extra = false, extended = false }
-})
-vim.keymap.set(
-  "n", 
-  "<leader>/", 
-  "<cmd>lua require('Comment.api').toggle.linewise.current()<CR>", 
-  { noremap = true, silent = true }
-)
-vim.keymap.set(
-  "v",
-  "<leader>/",
-  "<esc><cmd>lua require('Comment.api').toggle.linewise(vim.fn.visualmode())<CR>", 
-  { noremap = true, silent = true }
-)
+-- Commenting: Neovim has built-in `gc`/`gcc` since 0.10, so Comment.nvim is redundant.
+-- `remap = true` is required -- gc/gcc are expr mappings that must be allowed to expand.
+vim.keymap.set("n", "<leader>/", "gcc", { remap = true, silent = true })
+vim.keymap.set("x", "<leader>/", "gc", { remap = true, silent = true })
 
 -- Treesitter setup
 -- The `main` branch has no module system: no `configs.setup()`, no `ensure_installed`,
@@ -302,12 +330,13 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 })
 
--- Mason setup (still needed for installing language servers)
-require("mason").setup()
-require("mason-lspconfig").setup({
-  ensure_installed = { "pylsp", "jsonls", "ts_ls" },
-  automatic_enable = false  -- Disable automatic setup to prevent duplicates
-})
+-- Mason is configured in its lazy spec above (opts = ...).
+--
+-- Mason normally prepends this to PATH when it loads, but it now loads on VeryLazy --
+-- which fires *after* the FileType event that vim.lsp.enable() uses to spawn servers.
+-- Every server here lives only in mason's bin dir, so without this the first file
+-- opened gets no LSP at all (the spawn fails silently).
+vim.env.PATH = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "bin") .. ":" .. vim.env.PATH
 
 -- Configure language servers using the new vim.lsp.config API (Neovim 0.11+)
 -- Python LSP with custom settings
