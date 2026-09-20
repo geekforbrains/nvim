@@ -80,6 +80,22 @@ vim.keymap.set("n", "<leader>w", function()
   vim.wo.linebreak = vim.wo.wrap
 end, { noremap = true, silent = true }) -- Toggle line wrap
  
+-- Shared declarations. Everything below derives from these rather than
+-- repeating them, so the copies cannot fall out of step -- see lua/config/.
+local deps = require("config.deps")
+local servers = require("config.servers")
+local ts_languages = require("config.languages")
+
+-- nvim-lspconfig server names, used verbatim by both mason-lspconfig's
+-- `ensure_installed` and `vim.lsp.enable()`.
+local server_names = vim.tbl_keys(servers)
+table.sort(server_names)
+
+-- Icons are Nerd Font glyphs. Without one installed every icon renders as a
+-- missing-glyph box, which looks like a broken config rather than a missing
+-- font, so fall back to plain text instead and let :checkhealth explain.
+local has_nerd_font = deps.has_nerd_font()
+
 -- Plugin setup with lazy.nvim
 require("lazy").setup({
   spec = {
@@ -145,7 +161,9 @@ require("lazy").setup({
       event = "VeryLazy",
       dependencies = { "mason-org/mason.nvim" },
       opts = {
-        ensure_installed = { "pylsp", "jsonls", "ts_ls" },
+        -- Derived from lua/config/servers.lua, the same table that feeds
+        -- vim.lsp.enable() below, so the two lists cannot drift.
+        ensure_installed = server_names,
         automatic_enable = false, -- servers are enabled explicitly below
       },
     },
@@ -201,6 +219,11 @@ require("nvim-tree").setup({
       show = {
         git = false,  -- Disable git icons for performance
         diagnostics = false,  -- Disable diagnostic icons
+        -- Glyphs only render with a Nerd Font; without one the tree is a
+        -- column of missing-glyph boxes, so drop to a plain-text tree.
+        file = has_nerd_font,
+        folder = has_nerd_font,
+        folder_arrow = has_nerd_font,
       },
     },
     highlight_git = "none",  -- Disable git highlighting
@@ -276,10 +299,8 @@ vim.keymap.set("x", "<leader>/", "gc", { remap = true, silent = true })
 -- no `highlight.enable`. Parsers are installed via the Lua API and highlighting is
 -- started per-buffer with `vim.treesitter.start()`.
 --
--- markdown/markdown_inline are deliberately absent: Neovim 0.12 bundles both parsers
--- and their queries, and installing them here shadows the bundled ones.
--- For these languages the parser name matches the filetype, so one list serves both.
-local ts_languages = { "html", "css", "javascript", "typescript", "python", "htmldjango" }
+-- The language list lives in lua/config/languages.lua so the health check can
+-- report on exactly what this config asked for.
 require("nvim-treesitter").install(ts_languages)
 
 vim.api.nvim_create_autocmd("FileType", {
@@ -309,7 +330,8 @@ vim.api.nvim_create_autocmd("FileType", {
 -- Lualine setup
 require('lualine').setup({
   options = {
-    theme = 'nord'
+    theme = 'nord',
+    icons_enabled = has_nerd_font,  -- see has_nerd_font above
   }
 })
 
@@ -338,30 +360,38 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- opened gets no LSP at all (the spawn fails silently).
 vim.env.PATH = vim.fs.joinpath(vim.fn.stdpath("data"), "mason", "bin") .. ":" .. vim.env.PATH
 
--- Configure language servers using the new vim.lsp.config API (Neovim 0.11+)
--- Python LSP with custom settings
-vim.lsp.config("pylsp", {
-  settings = {
-    pylsp = {
-      plugins = {
-        flake8 = { enabled = true },
-        pycodestyle = { enabled = false },
-        mccabe = { enabled = false },
-        pyflakes = { enabled = false },
-      },
-    },
-  },
-})
-
--- Configure other language servers with default settings
-local servers = { "ts_ls", "jsonls", "html", "cssls" }
-for _, server in ipairs(servers) do
-  -- Basic config for each server (configs will be loaded from nvim-lspconfig)
-  vim.lsp.config(server, {})
+-- Configure language servers using the new vim.lsp.config API (Neovim 0.11+).
+-- Settings live in lua/config/servers.lua; both the loop and the enable call
+-- below read that one table, so no server can be configured without being
+-- enabled, or enabled without being installed.
+for name, cfg in pairs(servers) do
+  vim.lsp.config(name, cfg)
 end
+vim.lsp.enable(server_names)
 
--- Enable all configured language servers (including pylsp)
-vim.lsp.enable({ "pylsp", "ts_ls", "jsonls", "html", "cssls" })
+-- Preflight: report missing external tools once, with the fix, instead of
+-- letting mason and nvim-treesitter fail later behind errors that name neither.
+-- Scheduled so it lands after startup output rather than adding to the
+-- "Press ENTER" pile-up that made the original failure so opaque.
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = function()
+    vim.schedule(function()
+      local missing = deps.missing()
+      local lines = {}
+      for _, d in ipairs(missing) do
+        lines[#lines + 1] = ("  %-12s %s"):format(d.cmd, d.install)
+      end
+      if not has_nerd_font then
+        lines[#lines + 1] = ("  %-12s %s"):format("nerd font", deps.nerd_font.install)
+      end
+      if #lines == 0 then
+        return
+      end
+      table.insert(lines, 1, "Missing external tools (`:checkhealth config` for detail):")
+      vim.notify(table.concat(lines, "\n"), vim.log.levels.WARN)
+    end)
+  end,
+})
 
 -- Autocommands
 vim.api.nvim_create_autocmd("VimEnter", {
