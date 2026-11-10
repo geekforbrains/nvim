@@ -77,4 +77,37 @@ function M.has_nerd_font()
   return #found > 0, found
 end
 
+--- iTerm2's non-ASCII font setting for its default profile, or nil when not
+--- running in iTerm2 or the prefs cannot be read.
+---
+--- Installing the font is only half of it: iTerm2 must also be told to draw
+--- non-ASCII glyphs with it, or icons are still missing-glyph boxes. Read via
+--- `defaults` (not the plist file) so a change made in the GUI is seen at once.
+---@return { enabled: boolean, font: string?, name: string? }?
+function M.iterm_nonascii_font()
+  if vim.env.TERM_PROGRAM ~= "iTerm.app" then
+    return nil
+  end
+  local guid = vim.trim(vim.fn.system({ "defaults", "read", "com.googlecode.iterm2", "Default Bookmark Guid" }))
+  if vim.v.shell_error ~= 0 then
+    return nil
+  end
+  local json = vim.fn.system(
+    "defaults export com.googlecode.iterm2 - | plutil -extract 'New Bookmarks' json -o - -"
+  )
+  if vim.v.shell_error ~= 0 then
+    return nil
+  end
+  local ok, profiles = pcall(vim.json.decode, json)
+  if not ok or type(profiles) ~= "table" then
+    return nil
+  end
+  for _, p in ipairs(profiles) do
+    if p.Guid == guid then
+      return { enabled = p["Use Non-ASCII Font"] == true, font = p["Non Ascii Font"], name = p.Name }
+    end
+  end
+  return nil
+end
+
 return M

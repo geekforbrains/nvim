@@ -35,7 +35,18 @@ local function check_font()
     else
       H.ok(("Nerd Font installed (%d file%s), e.g. %s")
         :format(#found, #found == 1 and "" or "s", vim.fn.fnamemodify(found[1], ":t")))
-      H.info("the terminal must also be told to use it for non-ASCII text")
+      local iterm = deps.iterm_nonascii_font()
+      if iterm == nil then
+        H.info("the terminal must also be told to use it for non-ASCII text")
+      elseif iterm.enabled and iterm.font and iterm.font:match("^SymbolsNF") then
+        H.ok(("iTerm2 profile %q draws non-ASCII text with %s"):format(iterm.name or "?", iterm.font))
+      else
+        H.error(("iTerm2 profile %q is not using the Nerd Font for non-ASCII text -- icons will be ? boxes")
+          :format(iterm.name or "?"), {
+          'iTerm2 > Settings > Profiles > Text: check "Use a different font for non-ASCII text"',
+          "and choose Symbols Nerd Font Mono (takes effect immediately)",
+        })
+      end
     end
   else
     H.warn("no Nerd Font installed -- " .. deps.nerd_font.why, {

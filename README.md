@@ -4,36 +4,66 @@ Neovim 0.12+, lazy.nvim, nord.
 
 ## Setup on a new machine
 
+Prerequisites: [Homebrew](https://brew.sh) and `xcode-select --install`.
+
 ```sh
-brew bundle --file ~/.config/nvim/Brewfile   # external tools (see Brewfile)
-nvim                                         # lazy.nvim bootstraps plugins
+gh repo clone geekforbrains/nvim ~/.config/nvim
+~/.config/nvim/bootstrap.sh
 ```
 
-Then point the terminal at the Nerd Font, or every icon renders as a
-missing-glyph box. In iTerm2:
+`bootstrap.sh` is idempotent and does everything headless, so the first real
+`nvim` opens fully working:
+
+1. `brew bundle` -- external tools and the Nerd Font (see `Brewfile`)
+2. `:Lazy! restore` -- plugins at exactly the commits in `lazy-lock.json`
+3. treesitter parsers, blocking until compiled
+4. language servers from `lua/config/servers.lua`, via mason
+5. `:checkhealth config` -- exits non-zero if anything failed
+
+Then two manual steps:
+
+**iTerm2 font** -- or every icon renders as a `?` box. With iTerm2 open:
 
 > Settings -> Profiles -> Text -> check "Use a different font for non-ASCII
 > text" -> **Symbols Nerd Font Mono**
 
-Leave the main font alone; only the glyphs the main font lacks come from the
-Nerd Font. `set-iterm-nerdfont.py` does this from the command line instead, and
-must run with iTerm2 fully quit -- it rewrites its preferences on exit.
+It applies immediately. Leave the main font alone; only glyphs it lacks come
+from the Nerd Font. `:checkhealth config` verifies this when run inside iTerm2.
+`set-iterm-nerdfont.py` does the same unattended, but only with iTerm2 fully
+quit (run it from Terminal.app) -- iTerm2 rewrites its prefs on exit and would
+silently undo it.
 
-Finally:
+**Copilot** -- `:Copilot setup` once (needs a browser).
 
-```vim
-:checkhealth config
-```
+## Gotchas this config already handles
+
+- **Light Nord.** Neovim asks the terminal for its background colour, and
+  nord.nvim switches to its light palette on a light terminal profile.
+  `init.lua` sets `background=dark` so Nord is always the dark theme. The
+  terminal's own colours are separate -- outside nvim it stays whatever the
+  iTerm2 profile says.
+- **Dirty lockfile after first launch.** lazy.nvim bootstraps itself from its
+  latest stable tag, usually newer than the lockfile. `bootstrap.sh` runs
+  `:Lazy! restore` to pin it back.
+- **"Plugin Updates -- Press ENTER" on every launch.** The update checker still
+  runs but no longer notifies. Use `:Lazy` to see and apply updates, then commit
+  `lazy-lock.json`.
+- **No LSP on the first file.** mason loads on `VeryLazy`, after the first
+  `FileType` event, so `init.lua` puts mason's bin dir on `PATH` itself. Servers
+  install on first interactive launch if `bootstrap.sh` was skipped.
 
 ## Layout
 
 | File | Purpose |
 | --- | --- |
+| `bootstrap.sh` | One-shot, idempotent setup on a new machine |
+| `Brewfile` | External tools; kept in sync with `deps.lua` |
+| `set-iterm-nerdfont.py` | Sets iTerm2's non-ASCII font without the GUI |
 | `init.lua` | Options, keymaps, plugin specs, LSP and treesitter wiring |
 | `lua/config/servers.lua` | Language servers. **Single source of truth** |
 | `lua/config/languages.lua` | Treesitter languages |
 | `lua/config/deps.lua` | External tools, why each is needed, how to install |
-| `lua/config/health.lua` | `:checkhealth config` |
+| `lua/config/health.lua` | `:checkhealth config`, including iTerm2's font setting |
 
 ## Why the indirection
 
