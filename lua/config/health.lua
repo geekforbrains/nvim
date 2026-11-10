@@ -40,6 +40,13 @@ local function check_font()
         H.info("the terminal must also be told to use it for non-ASCII text")
       elseif iterm.enabled and iterm.font and iterm.font:match("^SymbolsNF") then
         H.ok(("iTerm2 profile %q draws non-ASCII text with %s"):format(iterm.name or "?", iterm.font))
+        if iterm.name ~= "Nord" then
+          H.warn(("iTerm2's default profile is %q, not Nord -- the terminal around nvim keeps its own colours")
+            :format(iterm.name or "?"), {
+            "run bootstrap.sh to install the Nord profile (iterm/nord.json)",
+            "then iTerm2 > Settings > Profiles > Nord > Other Actions > Set as Default",
+          })
+        end
       else
         H.error(("iTerm2 profile %q is not using the Nerd Font for non-ASCII text -- icons will be ? boxes")
           :format(iterm.name or "?"), {

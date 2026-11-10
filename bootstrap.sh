@@ -20,6 +20,21 @@ xcode-select -p >/dev/null 2>&1 || {
 step "External tools (Brewfile)"
 brew bundle --file Brewfile
 
+# A dynamic profile, so iTerm2 picks it up live -- even while running, unlike
+# its main prefs, which it overwrites on quit. It inherits everything (fonts,
+# including the Nerd Font setting) from the "Default" profile and only adds
+# the official Nord colours (nordtheme/iterm2). Making it the default profile
+# is one click in the GUI; see README.
+step "iTerm2 Nord profile"
+if [ -d /Applications/iTerm.app ]; then
+  dest="$HOME/Library/Application Support/iTerm2/DynamicProfiles"
+  mkdir -p "$dest"
+  cp iterm/nord.json "$dest/nord.json"
+  echo "installed $dest/nord.json"
+else
+  echo "iTerm2 not installed; skipped"
+fi
+
 # init.lua bootstraps lazy.nvim from its latest stable tag, which is usually
 # newer than lazy-lock.json and dirties the lockfile. `restore` pins every
 # plugin, lazy.nvim included, to exactly what the lockfile says.
