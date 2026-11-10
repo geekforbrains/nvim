@@ -40,6 +40,9 @@ vim.g.loaded_ruby_provider = 0
 vim.g.loaded_perl_provider = 0
 vim.g.loaded_node_provider = 0
 vim.opt.termguicolors = true
+-- Set explicitly: otherwise Neovim asks the terminal for its background and,
+-- on a light terminal profile, nord.nvim switches to its light palette.
+vim.opt.background = "dark"
 vim.opt.clipboard = "unnamedplus"
 vim.opt.number = true
 vim.opt.cursorline = true
@@ -180,7 +183,8 @@ require("lazy").setup({
     },
   },
   install = { colorscheme = { "nord" } },
-  checker = { enabled = true },
+  -- Check for updates, but don't pop a "Press ENTER" list on startup; see :Lazy.
+  checker = { enabled = true, notify = false },
   -- No plugin here uses luarocks; this skips the hererocks bootstrap and the
   -- spurious ERROR it otherwise reports in `:checkhealth lazy`.
   rocks = { enabled = false },
